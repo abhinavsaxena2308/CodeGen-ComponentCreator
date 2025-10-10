@@ -2,7 +2,7 @@ import React from 'react'
 
 const Footer = () => {
   return (
-    <div className='bg-gradient-to-r from-white to-black'>
+    <div className='bg-gradient-to-r from-purple-900 to-pink-300'>
       footer
     </div>
   )

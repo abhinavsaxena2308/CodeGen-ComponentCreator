@@ -2,7 +2,7 @@ import React from 'react'
 
 const Docs = () => {
   return (
-    <div>
+    <div h-screen>
       Docs
     </div>
   )
