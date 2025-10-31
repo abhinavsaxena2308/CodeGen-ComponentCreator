@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { FaCode, FaArrowRight } from 'react-icons/fa';
+import ElectricBorder from '../component/ElectricBorder';
 
 const Landing = () => {
   return (
@@ -15,10 +16,11 @@ const Landing = () => {
             CodeGen Component Creator
           </h1>
           <p className="text-xl text-gray-300 max-w-3xl mx-auto mb-10">
-            Create beautiful, responsive React components with AI-powered suggestions and real-time previews.
-            Streamline your development workflow and build faster than ever.
+            Create beautiful, responsive React components with AI-powered
+            suggestions and real-time previews. Streamline your development
+            workflow and build faster than ever.
           </p>
-          
+
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
               to="/auth"
@@ -38,31 +40,48 @@ const Landing = () => {
       </div>
 
       {/* Features Section */}
-      <div id="features" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+      <div
+        id="features"
+        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20"
+      >
         <h2 className="text-3xl font-bold text-center mb-12">Features</h2>
         <div className="grid md:grid-cols-3 gap-8">
           {[
             {
-              title: 'AI-Powered',
-              description: 'Generate components using advanced AI suggestions tailored to your needs.',
-              icon: '🤖'
+              title: "AI-Powered",
+              description:
+                "Generate components using advanced AI suggestions tailored to your needs.",
+              icon: "🤖",
             },
             {
-              title: 'Real-time Preview',
-              description: 'See your changes instantly as you build and customize components.',
-              icon: '⚡'
+              title: "Real-time Preview",
+              description:
+                "See your changes instantly as you build and customize components.",
+              icon: "⚡",
             },
             {
-              title: 'Fully Responsive',
-              description: 'Create components that look great on any device or screen size.',
-              icon: '📱'
-            }
+              title: "Fully Responsive",
+              description:
+                "Create components that look great on any device or screen size.",
+              icon: "📱",
+            },
           ].map((feature, index) => (
-            <div key={index} className="bg-gray-800/50 p-6 rounded-xl hover:bg-gray-800/70 transition-colors duration-200">
-              <div className="text-4xl mb-4">{feature.icon}</div>
-              <h3 className="text-xl font-semibold mb-2 text-green-400">{feature.title}</h3>
-              <p className="text-gray-300">{feature.description}</p>
-            </div>
+            <ElectricBorder
+              key={index}
+              color="#7df9ff"
+              speed={1}
+              chaos={0.5}
+              thickness={2}
+              style={{ borderRadius: 16 }}
+            >
+              <div className="bg-gray-800/50 p-6 rounded-xl hover:bg-gray-800/70 transition-colors duration-200 h-full">
+                <div className="text-4xl mb-4">{feature.icon}</div>
+                <h3 className="text-xl font-semibold mb-2 text-green-400">
+                  {feature.title}
+                </h3>
+                <p className="text-gray-300">{feature.description}</p>
+              </div>
+            </ElectricBorder>
           ))}
         </div>
       </div>
@@ -70,9 +89,12 @@ const Landing = () => {
       {/* CTA Section */}
       <div className="bg-gray-800/30 mt-20 py-16">
         <div className="max-w-3xl mx-auto text-center px-4">
-          <h2 className="text-3xl font-bold mb-6">Ready to build something amazing?</h2>
+          <h2 className="text-3xl font-bold mb-6">
+            Ready to build something amazing?
+          </h2>
           <p className="text-gray-300 mb-8">
-            Join thousands of developers who are already creating beautiful components with CodeGen.
+            Join thousands of developers who are already creating beautiful
+            components with CodeGen.
           </p>
           <Link
             to="/auth"
