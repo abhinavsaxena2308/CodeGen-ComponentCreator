@@ -1,16 +1,21 @@
 import React, { useState } from 'react';
-import { FaGithub, FaGoogle, FaEnvelope, FaLock, FaUser, FaArrowRight, FaCode } from 'react-icons/fa';
+import { FaGithub, FaGoogle, FaEnvelope, FaLock, FaUser, FaArrowRight, FaCode, FaSpinner } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { signIn, signUp } from '../services/auth.js';
+import { toast } from 'react-hot-toast';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     confirmPassword: ''
   });
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -18,21 +23,60 @@ const Auth = () => {
       ...prev,
       [name]: value
     }));
+    if (error) setError('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Handle form submission
-    console.log('Form submitted:', formData);
+    setError('');
+
+    if (!formData.email || !formData.password) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    if (!isLogin && formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      let result;
+      if (isLogin) {
+        result = await signIn(formData.email, formData.password);
+        if (result.error) throw result.error;
+        toast.success('Successfully signed in!');
+        navigate('/');
+      } else {
+        result = await signUp(formData.email, formData.password);
+        if (result.error) throw result.error;
+        toast.success('Account created! Please check your email to verify your account.');
+        setIsLogin(true);
+      }
+    } catch (error) {
+      console.error('Authentication error:', error);
+      setError(error.message || 'An error occurred. Please try again.');
+      toast.error(error.message || 'Authentication failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const toggleForm = () => {
     setIsLogin(!isLogin);
+    setError('');
+  };
+
+  const handleSocialLogin = (provider) => {
+    toast.info(`${provider} login coming soon!`);
   };
 
   return (
-    <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+        
         {/* Logo */}
         <div className="text-center mb-10">
           <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-green-500/20">
@@ -42,33 +86,53 @@ const Auth = () => {
             CodeGen
           </h1>
           <p className="text-gray-400 mt-2">
-            {isLogin ? 'Welcome back! Please sign in to continue.' : 'Create an account to get started'}
+            {isLogin ? 'Welcome back! Please sign in to continue.' : 'Create an account to get started.'}
           </p>
         </div>
 
-        {/* Social Auth Buttons */}
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-900/30 border border-red-700/50 rounded-lg text-red-200 text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* Social Buttons */}
         <div className="grid grid-cols-2 gap-4 mb-6">
-          <button className="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700/80 text-white py-2.5 px-4 rounded-lg transition-colors border border-gray-700/50">
+          <button
+            onClick={() => handleSocialLogin('GitHub')}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+            disabled={isLoading}
+          >
             <FaGithub className="w-5 h-5" />
             <span>GitHub</span>
           </button>
-          <button className="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700/80 text-white py-2.5 px-4 rounded-lg transition-colors border border-gray-700/50">
+          <button
+            onClick={() => handleSocialLogin('Google')}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+            disabled={isLoading}
+          >
             <FaGoogle className="w-5 h-5" />
             <span>Google</span>
           </button>
         </div>
 
-        <div className="flex items-center my-6">
-          <div className="flex-1 h-px bg-gray-700"></div>
-          <span className="px-4 text-sm text-gray-400">OR</span>
-          <div className="flex-1 h-px bg-gray-700"></div>
+        {/* Divider */}
+        <div className="relative mb-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-700"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-gray-900 text-gray-400">Or continue with email</span>
+          </div>
         </div>
 
-        {/* Auth Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-5">
           <AnimatePresence mode="wait">
             {!isLogin && (
               <motion.div
+                key="nameField"
                 initial={{ opacity: 0, height: 0, marginBottom: 0 }}
                 animate={{ opacity: 1, height: 'auto', marginBottom: '1rem' }}
                 exit={{ opacity: 0, height: 0, marginBottom: 0 }}
@@ -126,6 +190,7 @@ const Auth = () => {
           <AnimatePresence mode="wait">
             {!isLogin && (
               <motion.div
+                key="confirmPasswordField"
                 initial={{ opacity: 0, height: 0, marginBottom: 0 }}
                 animate={{ opacity: 1, height: 'auto', marginBottom: '1rem' }}
                 exit={{ opacity: 0, height: 0, marginBottom: 0 }}
@@ -173,10 +238,20 @@ const Auth = () => {
 
           <button
             type="submit"
-            className="w-full flex justify-center items-center gap-2 py-3 px-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-medium rounded-lg shadow-lg shadow-green-500/20 transition-all duration-200"
+            disabled={isLoading}
+            className={`w-full flex justify-center items-center gap-2 py-3 px-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-medium rounded-lg shadow-lg shadow-green-500/20 transition-all duration-200 ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
           >
-            <span>{isLogin ? 'Sign in' : 'Create account'}</span>
-            <FaArrowRight className="w-4 h-4" />
+            {isLoading ? (
+              <>
+                <FaSpinner className="animate-spin w-4 h-4" />
+                {isLogin ? 'Signing in...' : 'Creating account...'}
+              </>
+            ) : (
+              <>
+                <span>{isLogin ? 'Sign in' : 'Create account'}</span>
+                <FaArrowRight className="w-4 h-4" />
+              </>
+            )}
           </button>
         </form>
 
@@ -187,6 +262,7 @@ const Auth = () => {
               type="button"
               onClick={toggleForm}
               className="font-medium text-green-400 hover:text-green-300 transition-colors"
+              disabled={isLoading}
             >
               {isLogin ? 'Sign up' : 'Sign in'}
             </button>

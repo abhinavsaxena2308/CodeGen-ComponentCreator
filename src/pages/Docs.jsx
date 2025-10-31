@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FaCode, FaTerminal, FaCog, FaRocket, FaChevronRight } from 'react-icons/fa';
+import { FaCode, FaTerminal, FaRocket, FaChevronRight } from 'react-icons/fa';
 import { SiJavascript, SiReact, SiTailwindcss } from 'react-icons/si';
 
 const Docs = () => {

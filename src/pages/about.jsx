@@ -1,6 +1,6 @@
 import React from 'react';
-import { FaCode, FaUsers, FaRocket, FaShieldAlt } from 'react-icons/fa';
-import { MdOutlineSecurity, MdSpeed } from 'react-icons/md';
+import { FaCode, FaUsers, FaShieldAlt } from 'react-icons/fa';
+import { MdSpeed } from 'react-icons/md';
 
 const About = () => {
   const features = [
@@ -45,7 +45,7 @@ const About = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-black text-white  mt-16">
       {/* Hero Section */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <div className="text-center">
