@@ -599,7 +599,7 @@ const Homepage = () => {
               <FaChevronRight className="w-5 h-5 text-gray-400" />
             </button>
             <Link
-          to={user ? "/app" : "/"}
+          to={user ? "/" : "/"}
           className="flex items-center group space-x-2"
         >
           <div className="p-1.5 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 group-hover:rotate-12 transition-transform duration-500">
