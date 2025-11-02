@@ -28,19 +28,9 @@ const About = () => {
 
   const team = [
     {
-      name: 'John Doe',
-      role: 'Founder & CEO',
-      avatar: 'https://randomuser.me/api/portraits/men/1.jpg'
-    },
-    {
-      name: 'Jane Smith',
-      role: 'Lead Developer',
-      avatar: 'https://randomuser.me/api/portraits/women/1.jpg'
-    },
-    {
-      name: 'Alex Johnson',
-      role: 'UI/UX Designer',
-      avatar: 'https://randomuser.me/api/portraits/men/2.jpg'
+      name: 'Abhinav Saxena',
+      role: 'Founder',
+      avatar: ''
     }
   ];
 
@@ -84,7 +74,7 @@ const About = () => {
         <h2 className="text-3xl font-bold text-center mb-12">
           Meet Our <span className="text-green-400">Team</span>
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-8">
           {team.map((member, index) => (
             <div 
               key={index}

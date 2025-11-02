@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { FaCode, FaArrowRight } from "react-icons/fa";
+import { FaArrowRight } from "react-icons/fa";
 import ElectricBorder from "../component/ElectricBorder";
 import Hyperspeed from "../component/Hyperspeed"; // adjust path if needed
 import { hyperspeedPresets } from "../component/hyperspeedPresets"; // adjust path if needed
@@ -37,8 +37,7 @@ const Landing = () => {
                 Learn More
               </Link>
             </div>
-          
-</div>
+          </div>
         </div>
         {/* Features Section */}
         <div
@@ -86,8 +85,6 @@ const Landing = () => {
             ))}
           </div>
         </div>
-
-        
 
         {/* CTA Section */}
         <div className="bg-gray-800/30 mt-0 py-16">
