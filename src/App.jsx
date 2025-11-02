@@ -49,40 +49,81 @@ const AuthRoute = ({ children }) => {
   return children;
 };
 
+// Layout component that conditionally renders navbar and footer
+const Layout = ({ children, showNavbar = true, showFooter = true }) => {
+  return (
+    <>
+      {showNavbar && <Navbar />}
+      <main className="flex-grow">
+        <div className="w-full">
+          {children}
+        </div>
+      </main>
+      {showFooter && <Footer />}
+    </>
+  );
+};
+
 function App() {
   return (
     <AuthProvider>
       <Router>
         <ScrollToTop />
         <div className="min-h-screen flex flex-col bg-gray-900 text-white">
-          <Navbar />
-          <main className="flex-grow">
-            <div className="w-full">
-              <Routes>
-                <Route path="/" element={<Landing />} />
-                <Route 
-                  path="/app" 
-                  element={
-                    <ProtectedRoute>
-                      <Homepage />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route path="/about" element={<About />} />
-                <Route path="/docs" element={<Docs />} />
-                <Route 
-                  path="/auth" 
-                  element={
-                    <AuthRoute>
-                      <Auth />
-                    </AuthRoute>
-                  } 
-                />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </div>
-          </main>
-          <Footer />
+          <Routes>
+            <Route 
+              path="/" 
+              element={
+                <Layout showNavbar={true} showFooter={true}>
+                  <Landing />
+                </Layout>
+              } 
+            />
+            <Route 
+              path="/app" 
+              element={
+                <ProtectedRoute>
+                  <Layout showNavbar={false} showFooter={false}>
+                    <Homepage />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/about" 
+              element={
+                <Layout showNavbar={true} showFooter={true}>
+                  <About />
+                </Layout>
+              } 
+            />
+            <Route 
+              path="/docs" 
+              element={
+                <Layout showNavbar={true} showFooter={true}>
+                  <Docs />
+                </Layout>
+              } 
+            />
+            <Route 
+              path="/auth" 
+              element={
+                <AuthRoute>
+                  <Layout showNavbar={true} showFooter={true}>
+                    <Auth />
+                  </Layout>
+                </AuthRoute>
+              } 
+            />
+            <Route 
+              path="*" 
+              element={
+                <Layout showNavbar={true} showFooter={true}>
+                  <Navigate to="/" replace />
+                </Layout>
+              } 
+            />
+          </Routes>
           <Toaster position="bottom-right" />
         </div>
       </Router>

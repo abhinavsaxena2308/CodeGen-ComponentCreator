@@ -1,14 +1,15 @@
 import React, { useState, useRef, useEffect } from "react";
-import { MdCode, MdSend, MdVisibility } from "react-icons/md";
-import { FaChevronRight, FaChevronLeft, FaPlus, FaTrash } from "react-icons/fa";
-import { motion } from 'framer-motion';
+import { MdCode, MdSend, MdVisibility, MdAutoAwesome } from "react-icons/md";
+import { FaCat, FaChevronRight, FaChevronLeft, FaPlus, FaTrash, FaRobot, FaUser } from "react-icons/fa";
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { saveChat, getChatHistory } from '../services/mem0';
+import { Link } from "react-router-dom";
 
 const Homepage = () => {
   const { user } = useAuth();
-  const [showChatHistory, setShowChatHistory] = useState(true);
-  const [language, setLanguage] = useState("react");
+  const [showChatHistory, setShowChatHistory] = useState(false);
+  const [language, setLanguage] = useState("none");
   const [activeTab, setActiveTab] = useState("preview");
   const [chatHistory, setChatHistory] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);
@@ -22,10 +23,15 @@ const Homepage = () => {
   const [inputText, setInputText] = useState("");
   const [generatedCode, setGeneratedCode] = useState("");
   const [previewId, setPreviewId] = useState(null);
-  const [loadingGenerate, setLoadingGenerate] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const [mem0ErrorCount, setMem0ErrorCount] = useState(0); // Track Mem0 errors
   const messagesEndRef = useRef(null);
   const initialMountRef = useRef(true);
   const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const textareaRef = useRef(null);
+  const MAX_MEM0_ERRORS = 3; // Stop trying after 3 errors
 
   // Auto-scroll to bottom of messages (only after new messages)
   useEffect(() => {
@@ -39,9 +45,32 @@ const Homepage = () => {
     }
   }, [messages]);
 
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 150)}px`;
+    }
+  }, [inputText]);
+
   // Load chat history on mount
   useEffect(() => {
     const loadChatHistory = async () => {
+      // Skip if we've had too many Mem0 errors
+      if (mem0ErrorCount >= MAX_MEM0_ERRORS) {
+        // Load from localStorage only
+        const key = `chatHistory_${user?.id ?? 'guest'}`;
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          try {
+            setChatHistory(JSON.parse(stored));
+          } catch (e) {
+            console.warn("Failed to parse local chat history:", e);
+          }
+        }
+        return;
+      }
+
       const key = `chatHistory_${user?.id ?? 'guest'}`;
       if (user) {
         try {
@@ -52,6 +81,7 @@ const Homepage = () => {
           }
         } catch (error) {
           console.error("Error loading chat history from service:", error);
+          setMem0ErrorCount(prev => prev + 1); // Increment error count
         }
       }
       // localStorage fallback (works for guest or when service fails)
@@ -65,11 +95,14 @@ const Homepage = () => {
       }
     };
     loadChatHistory();
-  }, [user]);
+  }, [user, mem0ErrorCount]);
 
   // Save chat to Mem0 when messages change
   useEffect(() => {
     const saveCurrentChat = async () => {
+      // Skip if we've had too many Mem0 errors
+      if (mem0ErrorCount >= MAX_MEM0_ERRORS) return;
+      
       // Do not auto-create a new chat just because the user logged in.
       // Require either an existing chat id (user initiated) OR at least one user-authored message.
       if (messages.length <= 1) return;
@@ -103,9 +136,12 @@ const Homepage = () => {
       const key = `chatHistory_${user?.id ?? 'guest'}`;
       try {
         // try with chatId if service supports it; call without awaiting fallback below will still work
-        await (saveChat(user?.id, messages, chatId) || Promise.resolve());
+        if (user && mem0ErrorCount < MAX_MEM0_ERRORS) {
+          await saveChat(user.id, messages, chatId);
+        }
       } catch (serviceErr) {
         console.warn("saveChat service failed, falling back to localStorage:", serviceErr);
+        setMem0ErrorCount(prev => prev + 1); // Increment error count
         try {
           const existing = JSON.parse(localStorage.getItem(key) || "[]");
           const updated = [newChatHistoryItem, ...existing.filter((it) => it.id !== chatId)];
@@ -117,10 +153,16 @@ const Homepage = () => {
     };
     const timer = setTimeout(saveCurrentChat, 2000);
     return () => clearTimeout(timer);
-  }, [messages, user, currentChatId]);
+  }, [messages, user, currentChatId, mem0ErrorCount]);
 
   const handleSend = async () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || isGenerating) return;
+
+    // Check if language is selected
+    if (language === "none") {
+      setShowLanguageModal(true);
+      return;
+    }
 
     // Add user message
     const userMessage = {
@@ -131,6 +173,7 @@ const Homepage = () => {
     
     setMessages(prev => [...prev, userMessage]);
     setInputText("");
+    setIsGenerating(true);
 
     // Show typing indicator
     const typingMessage = {
@@ -157,14 +200,17 @@ const Homepage = () => {
       
       const data = await res.json();
       setGeneratedCode(data.code || "");
-      if (data.id) setPreviewId(data.id);
+      if (data.id) {
+        setPreviewId(data.id);
+        setIsPreviewLoading(true);
+      }
       
       // Remove typing indicator and add AI response
       setMessages(prev => prev.filter(msg => !msg.isTyping));
       
       const aiMessage = {
         id: Date.now() + 2,
-        text: `I've generated the component based on your request.`,
+        text: `I've generated the component based on your request. You can view the code or preview on the right panel.`,
         isUser: false,
         hasCode: true
       };
@@ -182,6 +228,8 @@ const Homepage = () => {
       };
       
       setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -215,8 +263,8 @@ const Homepage = () => {
 
     // Persist new chat (service if available; fallback to localStorage)
     const key = `chatHistory_${user?.id ?? 'guest'}`;
-    if (user) {
-      (saveChat(user.id, [initialMessage], chatId) || Promise.resolve()).catch(() => {
+    if (user && mem0ErrorCount < MAX_MEM0_ERRORS) {
+      saveChat(user.id, [initialMessage], chatId).catch(() => {
         try {
           const existing = JSON.parse(localStorage.getItem(key) || "[]");
           const updated = [newChat, ...existing.filter((it) => it.id !== chatId)];
@@ -241,7 +289,7 @@ const Homepage = () => {
     setGeneratedCode("");
     setPreviewId(null);
     setCurrentChatId(chat.id);
-    setShowChatHistory(true);
+    setShowChatHistory(false);
   };
 
   // Delete a saved chat (state + persistence fallback)
@@ -258,8 +306,8 @@ const Homepage = () => {
     // best-effort: ask service to remove/overwrite this chat; fallback to localStorage
     try {
       // If saveChat supports deletion via empty messages or a dedicated behaviour, attempt it
-      if (user) {
-        await (saveChat(user.id, [], chatId) || Promise.resolve());
+      if (user && mem0ErrorCount < MAX_MEM0_ERRORS) {
+        await saveChat(user.id, [], chatId);
       } else {
         // guest -> just update localStorage below
         throw new Error("guest");
@@ -275,143 +323,315 @@ const Homepage = () => {
     }
   };
 
+  // Format date for chat history items
+  const formatChatDate = (timestamp) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+    
+    if (diffInDays === 0) return "Today";
+    if (diffInDays === 1) return "Yesterday";
+    if (diffInDays < 7) return `${diffInDays} days ago`;
+    
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  // Handle iframe load
+  const handleIframeLoad = () => {
+    console.log("Iframe loaded");
+    setIsPreviewLoading(false);
+  };
+
+  // Handle iframe error
+  const handleIframeError = () => {
+    console.log("Iframe error");
+    setIsPreviewLoading(false);
+  };
+
   return (
-    <div className="flex h-screen bg-gray-900 text-white pt-16">
-      {/* History Sidebar */}
-      <div className={`hidden md:flex flex-col w-56 bg-gray-900 border-r border-gray-700 transition-all duration-300 ${showChatHistory ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="p-3">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-md font-semibold text-gray-200">History</h2>
-          </div>
+    <div className="flex h-screen bg-gradient-to-br from-gray-900 to-black text-white">
+      {/* Desktop Toggle Button */}
+      <button
+        onClick={() => setShowChatHistory(!showChatHistory)}
+        className="hidden md:flex absolute left-0 top-1/2 z-30 -translate-y-1/2 p-2 rounded-r-lg bg-gray-800/80 backdrop-blur-sm border border-gray-700/50 text-gray-300 hover:text-white hover:bg-gray-700/80 transition-all duration-300 shadow-lg"
+        title={showChatHistory ? "Collapse sidebar" : "Expand sidebar"}
+      >
+        <FaChevronLeft className={`w-4 h-4 transition-transform duration-300 ${showChatHistory ? '' : 'rotate-180'}`} />
+      </button>
 
-          <button
-            onClick={startNewChat}
-            className="w-full mb-3 flex items-center gap-2 p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 transition-colors duration-200 text-xs"
+      {/* History Sidebar - ChatGPT Style */}
+      <AnimatePresence mode="wait">
+        {showChatHistory && (
+          <motion.div 
+            className="hidden md:flex md:flex-col w-64 bg-gray-900/95 backdrop-blur-sm border-r border-gray-700/50 fixed top-0 left-0 h-full z-20"
+            initial={{ x: -260 }}
+            animate={{ x: 0 }}
+            exit={{ x: -260 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
           >
-            <FaPlus className="w-3 h-3" />
-            New chat
-          </button>
+            <div className="flex flex-col h-full p-3">
+              {/* Sidebar Header */}
+              <div className="flex items-center justify-between p-3">
+                <h2 className="text-lg font-semibold text-gray-200">History</h2>
+              </div>
 
-          <div className="space-y-0.5 overflow-y-auto flex-1" style={{ maxHeight: 'calc(100vh - 180px)' }}>
-            {chatHistory.map((chat) => (
-              <div
-                key={chat.id}
-                className="w-full flex items-center justify-between group"
+              {/* New Chat Button - Enhanced */}
+              <button
+                onClick={startNewChat}
+                className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white transition-all duration-300 mb-4 shadow-lg shadow-green-900/20 hover:shadow-green-900/40"
               >
-                <button
-                  onClick={() => loadChat(chat)}
-                  className="flex-1 text-left p-2 rounded-lg hover:bg-gray-800 text-gray-300 hover:text-white transition-colors duration-200 text-xs flex items-center gap-2 truncate"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0"></span>
-                  <span className="truncate">{chat.title}</span>
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); deleteChat(chat.id); }}
-                  title="Delete chat"
-                  className="ml-1 p-1 rounded-md text-gray-500 hover:text-red-400 hover:bg-gray-800 transition-colors opacity-0 group-hover:opacity-100"
-                >
-                  <FaTrash className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
+                <FaPlus className="w-4 h-4" />
+                <span className="font-medium">New chat</span>
+              </button>
 
-            {chatHistory.length === 0 && (
-              <div className="text-gray-500 text-xs p-2 text-center">
-                No chat history yet
+              {/* Chat History List - Scrollable */}
+              <div className="flex-1 overflow-y-auto overflow-x-hidden thin-scrollbar">
+                <div className="space-y-1 pb-2">
+                  {chatHistory.map((chat) => (
+                    <div
+                      key={chat.id}
+                      className="group relative"
+                    >
+                      <button
+                        onClick={() => loadChat(chat)}
+                        className={`w-full text-left p-3 rounded-xl transition-all duration-200 flex flex-col ${
+                          currentChatId === chat.id
+                            ? 'bg-gray-700/50 border border-green-900/30'
+                            : 'hover:bg-gray-800/50'
+                        }`}
+                      >
+                        <div className="font-medium text-gray-100 truncate text-sm">
+                          {chat.title}
+                        </div>
+                        <div className="text-xs text-gray-400 mt-1">
+                          {formatChatDate(chat.timestamp)}
+                        </div>
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteChat(chat.id); }}
+                        className="absolute top-1/2 right-2 transform -translate-y-1/2 p-2 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-900/20 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                        title="Delete chat"
+                      >
+                        <FaTrash className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+
+                  {chatHistory.length === 0 && (
+                    <div className="text-gray-500 text-sm p-4 text-center">
+                      No chat history yet
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
-        </div>
-      </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Mobile History Sidebar Overlay */}
-      {showChatHistory && (
-        <>
-          <div 
-            className="fixed inset-0 bg-black/50 z-40 md:hidden"
-            onClick={() => setShowChatHistory(false)}
-            style={{ top: '4rem' }}
-          />
-          <div className="fixed inset-y-0 left-0 z-50 w-56 bg-gray-900 border-r border-gray-700 p-3 md:hidden"
-               style={{ top: '4rem' }}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-md font-semibold text-gray-200">History</h2>
-              <button
-                onClick={() => setShowChatHistory(false)}
-                className="p-1 hover:bg-gray-800 rounded"
-              >
-                <FaChevronLeft className="w-3 h-3 text-gray-400" />
-              </button>
-            </div>
-
-            <button
-              onClick={startNewChat}
-              className="w-full mb-3 flex items-center gap-2 p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 transition-colors duration-200 text-xs"
+      <AnimatePresence>
+        {showChatHistory && (
+          <>
+            <motion.div 
+              className="fixed inset-0 bg-black/60 z-30 md:hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowChatHistory(false)}
+            />
+            <motion.div 
+              className="fixed inset-y-0 left-0 z-40 w-64 bg-gray-900 border-r border-gray-700 md:hidden"
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
             >
-              <FaPlus className="w-3 h-3" />
-              New chat
-            </button>
+              <div className="flex flex-col h-full p-3">
+                <div className="flex items-center justify-between p-3 mb-2">
+                  <h2 className="text-lg font-semibold text-gray-200">History</h2>
+                  <button
+                    onClick={() => setShowChatHistory(false)}
+                    className="p-2 hover:bg-gray-800 rounded-lg"
+                  >
+                    <FaChevronLeft className="w-4 h-4 text-gray-400" />
+                  </button>
+                </div>
 
-            <div className="space-y-0.5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 180px)' }}>
-              {chatHistory.map((chat) => (
-                <div
-                  key={chat.id}
-                  className="w-full flex items-center justify-between group"
+                <button
+                  onClick={startNewChat}
+                  className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white transition-all duration-300 mb-4 shadow-lg shadow-green-900/20"
                 >
-                  <button
-                    onClick={() => { loadChat(chat); setShowChatHistory(false); }}
-                    className="flex-1 text-left p-2 rounded-lg hover:bg-gray-800 text-gray-300 hover:text-white transition-colors duration-200 text-xs flex items-center gap-2 truncate"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0"></span>
-                    <span className="truncate">{chat.title}</span>
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); deleteChat(chat.id); }}
-                    title="Delete chat"
-                    className="ml-1 p-1 rounded-md text-gray-500 hover:text-red-400 hover:bg-gray-800 transition-colors"
-                  >
-                    <FaTrash className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
+                  <FaPlus className="w-4 h-4" />
+                  <span className="font-medium">New chat</span>
+                </button>
 
-              {chatHistory.length === 0 && (
-                <div className="text-gray-500 text-xs p-2 text-center">
-                  No chat history yet
+                <div className="flex-1 overflow-y-auto overflow-x-hidden thin-scrollbar">
+                  <div className="space-y-1 pb-2">
+                    {chatHistory.map((chat) => (
+                      <div
+                        key={chat.id}
+                        className="group relative"
+                      >
+                        <button
+                          onClick={() => { loadChat(chat); setShowChatHistory(false); }}
+                          className={`w-full text-left p-3 rounded-xl transition-all duration-200 flex flex-col ${
+                            currentChatId === chat.id
+                              ? 'bg-gray-700/50 border border-green-900/30'
+                              : 'hover:bg-gray-800/50'
+                          }`}
+                        >
+                          <div className="font-medium text-gray-100 truncate text-sm">
+                            {chat.title}
+                          </div>
+                          <div className="text-xs text-gray-400 mt-1">
+                            {formatChatDate(chat.timestamp)}
+                          </div>
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deleteChat(chat.id); }}
+                          className="absolute top-1/2 right-2 transform -translate-y-1/2 p-2 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-900/20"
+                          title="Delete chat"
+                        >
+                          <FaTrash className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+
+                    {chatHistory.length === 0 && (
+                      <div className="text-gray-500 text-sm p-4 text-center">
+                        No chat history yet
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Language Selection Modal */}
+      <AnimatePresence>
+        {showLanguageModal && (
+          <>
+            <motion.div 
+              className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowLanguageModal(false)}
+            >
+              <motion.div 
+                className="bg-gray-800 rounded-2xl border border-gray-700 w-full max-w-md"
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold text-white">Select Language</h3>
+                    <button 
+                      onClick={() => setShowLanguageModal(false)}
+                      className="text-gray-400 hover:text-white"
+                    >
+                      <FaChevronRight className="w-5 h-5 rotate-45" />
+                    </button>
+                  </div>
+                  <p className="text-gray-300 mb-6">
+                    Please select a programming language for your component generation.
+                  </p>
+                  
+                  <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto thin-scrollbar mb-6">
+                    {[
+                      { value: "react", label: "React" },
+                      { value: "vue", label: "Vue" },
+                      { value: "angular", label: "Angular" },
+                      { value: "html", label: "HTML" },
+                      { value: "css", label: "CSS" },
+                      { value: "html+css", label: "HTML + CSS" },
+                      { value: "html+tailwind", label: "HTML + Tailwind" },
+                      { value: "javascript", label: "JavaScript" },
+                      { value: "typescript", label: "TypeScript" },
+                      { value: "python", label: "Python" },
+                      { value: "java", label: "Java" }
+                    ].map((lang) => (
+                      <button
+                        key={lang.value}
+                        onClick={() => {
+                          setLanguage(lang.value);
+                          setShowLanguageModal(false);
+                          // We need to trigger the send again after setting the language
+                          setTimeout(() => {
+                            handleSend();
+                          }, 100);
+                        }}
+                        className="p-3 text-left rounded-xl bg-gray-700/50 hover:bg-gray-700 border border-gray-600 hover:border-green-500/50 transition-all text-gray-200 hover:text-white"
+                      >
+                        {lang.label}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  <button
+                    onClick={() => setShowLanguageModal(false)}
+                    className="w-full py-3 px-4 bg-gray-700 hover:bg-gray-600 rounded-xl text-gray-300 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col h-full">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-900 fixed top-16 left-0 right-0 z-10">
+      <div className={`flex-1 flex flex-col h-screen transition-all duration-300 ${showChatHistory ? 'md:ml-64' : ''}`}>
+        {/* Header with Mobile Toggle */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-800/50 bg-gray-900/80 backdrop-blur-sm sticky top-0 z-10">
           <div className="flex items-center">
             <button
-              onClick={() => setShowChatHistory(!showChatHistory)}
-              className="md:hidden p-2 mr-2 rounded-md hover:bg-gray-800"
+              onClick={() => setShowChatHistory(true)}
+              className="md:hidden p-2 mr-2 rounded-lg hover:bg-gray-800 transition-colors"
             >
               <FaChevronRight className="w-5 h-5 text-gray-400" />
             </button>
-            <h1 className="text-xl font-semibold text-gray-200">Component Generator</h1>
+            <Link
+          to={user ? "/app" : "/"}
+          className="flex items-center group space-x-2"
+        >
+          <div className="p-1.5 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 group-hover:rotate-12 transition-transform duration-500">
+            <FaCat className="w-5 h-5 text-white" />
           </div>
-          <div className="flex items-center gap-2">
+          <span className="text-lg md:text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent group-hover:from-green-300 group-hover:to-emerald-400 transition-all duration-300">
+            CodeGen
+          </span>
+        </Link>
+          </div>
+          <div className="flex items-center gap-3">
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              className="bg-gray-800 text-gray-200 px-3 py-1.5 rounded-lg border border-gray-700 text-sm focus:border-green-500 focus:outline-none"
+              className="bg-gray-800/80 text-gray-200 px-3 py-2 rounded-lg border border-gray-700/50 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500 backdrop-blur-sm"
             >
+              <option value="none" disabled>Select Language</option>
               <option value="react">React</option>
-              <option value="javascript">JavaScript</option>
+              <option value="vue">Vue</option>
+              <option value="angular">Angular</option>
               <option value="html">HTML</option>
-              <option value="html+tailwind">Tailwind</option>
+              <option value="css">CSS</option>
+              <option value="html+css">HTML + CSS</option>
+              <option value="html+tailwind">HTML + Tailwind</option>
+              <option value="javascript">JavaScript</option>
+              <option value="typescript">TypeScript</option>
+              <option value="python">Python</option>
+              <option value="java">Java</option>
             </select>
             <button
               onClick={startNewChat}
-              className="p-2 rounded-md hover:bg-gray-800"
+              className="p-2 rounded-lg hover:bg-gray-800 transition-colors"
               title="New Chat"
             >
               <FaPlus className="w-5 h-5 text-gray-400" />
@@ -420,26 +640,30 @@ const Homepage = () => {
         </div>
 
         {/* Main Content - Responsive Layout */}
-        <div className="flex flex-col lg:flex-row flex-1 overflow-hidden pt-16">
+        <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
           {/* Chat Area */}
-          <div className="flex flex-col flex-1 lg:w-1/2 xl:w-2/3">
-            {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 pb-20">
-              <div className="max-w-3xl mx-auto">
+          <div className="flex flex-col flex-1 min-h-0">
+            {/* Messages Area - Independent Scrolling */}
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 pb-6 thin-scrollbar">
+              <div className="max-w-3xl mx-auto w-full">
                 {messages.map((message) => (
                   <motion.div
                     key={message.id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className={`py-4 ${message.isUser ? 'bg-gray-900' : 'bg-gray-800/50'}`}
+                    className={`py-5 ${message.isUser ? '' : 'bg-gray-800/30 rounded-2xl'}`}
                   >
-                    <div className="flex items-start gap-4 px-4">
+                    <div className="flex items-start gap-4 px-4 max-w-3xl mx-auto">
                       <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-1 ${
-                        message.isUser ? 'bg-blue-600' : 'bg-green-600'
+                        message.isUser 
+                          ? 'bg-gradient-to-r from-blue-600 to-indigo-600' 
+                          : 'bg-gradient-to-r from-green-600 to-emerald-600'
                       }`}>
-                        <span className="text-white text-xs font-bold">
-                          {message.isUser ? 'Y' : 'AI'}
-                        </span>
+                        {message.isUser ? (
+                          <FaUser className="text-white text-xs" />
+                        ) : (
+                          <FaRobot className="text-white text-xs" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         {message.isTyping ? (
@@ -452,7 +676,7 @@ const Homepage = () => {
                             <span className="text-gray-400">Thinking...</span>
                           </div>
                         ) : (
-                          <div className="text-gray-200 whitespace-pre-wrap">
+                          <div className="text-gray-200 whitespace-pre-wrap leading-relaxed">
                             {message.text}
                           </div>
                         )}
@@ -464,101 +688,171 @@ const Homepage = () => {
               </div>
             </div>
 
-            {/* Input Area - Fixed at Bottom */}
-            <div className="sticky bottom-0 bg-gray-900 border-t border-gray-700 p-4 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.3)]">
+            {/* Input Area - Fixed at Bottom with Shadow */}
+            <div className="sticky bottom-0 bg-gradient-to-b from-gray-900/90 to-gray-900 backdrop-blur-sm border-t border-gray-800/50 p-4 shadow-[0_-10px_25px_-5px_rgba(0,0,0,0.3)]">
               <div className="max-w-3xl mx-auto">
                 <div className="relative">
                   <textarea
+                    ref={textareaRef}
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
                     onKeyPress={handleKeyPress}
                     placeholder="Message Component Generator..."
-                    className="w-full bg-gray-800 text-gray-200 placeholder-gray-500 rounded-xl py-3 pl-4 pr-12 resize-none focus:outline-none focus:ring-1 focus:ring-green-500 border border-gray-700"
+                    className="w-full bg-gray-800/80 text-gray-200 placeholder-gray-500 rounded-2xl py-4 pl-5 pr-14 resize-none focus:outline-none focus:ring-1 focus:ring-green-500 border border-gray-700/50 backdrop-blur-sm shadow-lg shadow-gray-900/20"
                     rows="1"
+                    disabled={isGenerating}
                   />
                   <button
                     onClick={handleSend}
-                    disabled={!inputText.trim() || messages.some(msg => msg.isTyping)}
-                    className={`absolute right-3 bottom-3 p-1 rounded-lg transition-all ${
-                      inputText.trim() && !messages.some(msg => msg.isTyping)
-                        ? 'text-white bg-green-600 hover:bg-green-700'
+                    disabled={!inputText.trim() || isGenerating}
+                    className={`absolute right-3 bottom-3.5 p-2 rounded-xl transition-all ${
+                      inputText.trim() && !isGenerating
+                        ? 'text-white bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 shadow-lg shadow-green-900/30'
                         : 'text-gray-500 bg-gray-700/50'
                     }`}
                   >
-                    <MdSend className="w-5 h-5" />
+                    {isGenerating ? (
+                      <div className="w-5 h-5 border-2 border-gray-400 border-t-white rounded-full animate-spin"></div>
+                    ) : (
+                      <MdSend className="w-5 h-5" />
+                    )}
                   </button>
                 </div>
-                <div className="mt-2 text-center text-xs text-gray-500">
-                  Component Generator v1.0
+                <div className="mt-3 text-center text-xs text-gray-500 flex items-center justify-center gap-4">
+                  <span>Component Generator v1.0</span>
+                  <span>•</span>
+                  <span>Press Enter to send, Shift+Enter for new line</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Preview/Code Panel - Right side on large screens, below on small */}
-          <div className="lg:w-1/2 xl:w-1/3 border-t lg:border-t-0 lg:border-l border-gray-700 flex flex-col">
-            <div className="flex border-b border-gray-700">
+          <div className="lg:w-1/2 xl:w-2/5 border-t lg:border-t-0 lg:border-l border-gray-800/50 flex flex-col bg-gray-900/20 backdrop-blur-sm">
+            <div className="flex border-b border-gray-800/50">
               <button
                 onClick={() => setActiveTab("preview")}
-                className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 ${
+                className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-all ${
                   activeTab === "preview"
-                    ? "text-green-400 bg-gray-800/50"
-                    : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/30"
-                } transition-colors`}
+                    ? "text-green-400 bg-gray-800/30"
+                    : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/20"
+                }`}
               >
-                <MdVisibility className="w-4 h-4" />
+                <MdVisibility className="w-5 h-5" />
                 Preview
               </button>
               <button
                 onClick={() => setActiveTab("code")}
-                className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 ${
+                className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-all ${
                   activeTab === "code"
-                    ? "text-green-400 bg-gray-800/50"
-                    : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/30"
-                } transition-colors`}
+                    ? "text-green-400 bg-gray-800/30"
+                    : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/20"
+                }`}
               >
-                <MdCode className="w-4 h-4" />
+                <MdCode className="w-5 h-5" />
                 Code
               </button>
             </div>
-            <div className="flex-1 overflow-auto bg-gray-900/30 p-4">
-              {generatedCode ? (
-                activeTab === "preview" ? (
-                  previewId ? (
-                    <iframe
-                      title="generated-preview"
-                      src={`${API_BASE}/preview/${previewId}`}
-                      className="w-full h-full border-none rounded-md"
-                    />
+            <div className="flex-1 overflow-auto bg-gray-900/10 p-4 relative">
+              {activeTab === "preview" ? (
+                <>
+                  {isPreviewLoading && (
+                    <div className="absolute inset-0 bg-gray-900/80 backdrop-blur-sm z-10 flex items-center justify-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-gray-300">Loading preview...</span>
+                      </div>
+                    </div>
+                  )}
+                  {generatedCode ? (
+                    previewId ? (
+                      <iframe
+                        title="generated-preview"
+                        src={`${API_BASE}/preview/${previewId}`}
+                        className="w-full h-full border-none rounded-xl"
+                        onLoad={handleIframeLoad}
+                        onError={handleIframeError}
+                      />
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center text-gray-500 text-sm rounded-xl border-2 border-dashed border-gray-800/50 p-8 text-center">
+                        <MdVisibility className="w-12 h-12 mb-4 text-gray-600" />
+                        <h3 className="text-lg font-medium text-gray-400 mb-2">Component Preview</h3>
+                        <p className="max-w-md">
+                          Preview will appear here once the component is generated.
+                        </p>
+                      </div>
+                    )
                   ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-gray-500 text-sm rounded-lg border-2 border-dashed border-gray-800 p-8 text-center">
+                    <div className="h-full flex flex-col items-center justify-center text-gray-500 text-sm rounded-xl border-2 border-dashed border-gray-800/50 p-8 text-center">
                       <MdVisibility className="w-12 h-12 mb-4 text-gray-600" />
                       <h3 className="text-lg font-medium text-gray-400 mb-2">Component Preview</h3>
                       <p className="max-w-md">
-                        Preview will appear here once the component is generated.
+                        Enter a component description and click generate to see the preview here.
                       </p>
                     </div>
-                  )
-                ) : (
-                  <pre className="bg-gray-900/50 rounded-lg p-4 text-xs text-green-300 overflow-auto h-full">
-                    <code className="whitespace-pre-wrap">
-                      {generatedCode}
+                  )}
+                </>
+              ) : (
+                generatedCode ? (
+                  <pre className="bg-gray-900 rounded-xl p-4 text-sm overflow-auto h-full">
+                    <code className="whitespace-pre-wrap font-mono">
+                      <div className="text-gray-300">
+                        {generatedCode.split('\n').map((line, index) => (
+                          <div key={index} className="flex">
+                            <span className="text-gray-600 w-8 flex-shrink-0 select-none">{index + 1}</span>
+                            <span className="flex-1">
+                              {line
+                                .replace(/(import|export|from|default|const|let|var|function|return|if|else|for|while|class|extends|super|this|new|try|catch|finally|throw|switch|case|break|continue|do|in|of|typeof|instanceof|void|delete|with|debugger|yield|async|await|static|get|set|constructor)/g, 
+                                  '<span class="text-purple-400 font-medium">$1</span>')
+                                .replace(/(["'`].*?["'`])/g, 
+                                  '<span class="text-green-400">$1</span>')
+                                .replace(/(\d+)/g, 
+                                  '<span class="text-blue-400">$1</span>')
+                                .replace(/(\/\/.*$|\/\*[\s\S]*?\*\/)/gm, 
+                                  '<span class="text-gray-500">$1</span>')
+                                .replace(/({|}|\(|\)|\[|\]|;|:|,|\.)/g, 
+                                  '<span class="text-yellow-400">$1</span>')}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </code>
                   </pre>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-gray-500 text-sm rounded-xl border-2 border-dashed border-gray-800/50 p-8 text-center">
+                    <MdCode className="w-12 h-12 mb-4 text-gray-600" />
+                    <h3 className="text-lg font-medium text-gray-400 mb-2">Generated Code</h3>
+                    <p className="max-w-md">
+                      Enter a component description and click generate to see the code here.
+                    </p>
+                  </div>
                 )
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center text-gray-500 text-sm rounded-lg border-2 border-dashed border-gray-800 p-8 text-center">
-                  <MdCode className="w-12 h-12 mb-4 text-gray-600" />
-                  <h3 className="text-lg font-medium text-gray-400 mb-2">Generated Code</h3>
-                  <p className="max-w-md">
-                    Enter a component description and click generate to see the code or preview here.
-                  </p>
-                </div>
               )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Custom Scrollbar Styles */}
+      <style>{`
+        .thin-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .thin-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .thin-scrollbar::-webkit-scrollbar-thumb {
+          background-color: rgba(75, 85, 99, 0.5);
+          border-radius: 3px;
+        }
+        .thin-scrollbar::-webkit-scrollbar-thumb:hover {
+          background-color: rgba(75, 85, 99, 0.7);
+        }
+        
+        pre code span {
+          display: inline;
+        }
+      `}</style>
     </div>
   );
 };
