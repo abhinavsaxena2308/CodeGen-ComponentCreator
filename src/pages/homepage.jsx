@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { MdCode, MdSend, MdVisibility, MdAutoAwesome } from "react-icons/md";
-import { FaCat, FaChevronRight, FaChevronLeft, FaPlus, FaTrash, FaRobot, FaUser } from "react-icons/fa";
+import { FaChevronRight, FaChevronLeft, FaPlus, FaTrash, FaRobot, FaUser, FaCat } from "react-icons/fa";
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { saveChat, getChatHistory } from '../services/mem0';
@@ -26,12 +26,47 @@ const Homepage = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
-  const [mem0ErrorCount, setMem0ErrorCount] = useState(0); // Track Mem0 errors
+  const [mem0ErrorCount, setMem0ErrorCount] = useState(0);
+  const [showCopiedMessage, setShowCopiedMessage] = useState(false); // Add this state for copied message
   const messagesEndRef = useRef(null);
   const initialMountRef = useRef(true);
   const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
   const textareaRef = useRef(null);
-  const MAX_MEM0_ERRORS = 3; // Stop trying after 3 errors
+  const MAX_MEM0_ERRORS = 3;
+
+  // Simplified syntax highlighting function for better code visibility
+  const simpleHighlight = (code, lang) => {
+    if (!code) return '';
+    
+    // Split into lines
+    const lines = code.split('\n');
+    
+    // Apply basic syntax highlighting without language-specific rules
+    return lines.map((line, index) => {
+      let highlightedLine = line;
+      
+      // Escape HTML
+      highlightedLine = highlightedLine
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      
+      // Apply basic highlighting for all languages
+      highlightedLine = highlightedLine
+        .replace(/(\/\/.*$|\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->|\/\*[\s\S]*?\*\/)/gm, '<span style="color: #6A9955;">$1</span>') // Comments - green
+        .replace(/(["'`])(?:(?=(\\?))\2.)*?\1/g, '<span style="color: #CE9178;">$1</span>') // Strings - red
+        .replace(/\b(true|false|null|undefined|NaN|Infinity|True|False|None)\b/g, '<span style="color: #569CD6;">$1</span>') // Literals - blue
+        .replace(/\b\d+(?:\.\d+)?\b/g, '<span style="color: #B5CEA8;">$1</span>') // Numbers - light green
+        .replace(/([{}()\[\];:,.*+\-%<>!=&|?^~])/g, '<span style="color: #D4D4D4;">$1</span>'); // Operators - white
+      
+      return (
+        `<div style="display: flex; padding: 0 8px; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#2A2D2E'" onmouseout="this.style.backgroundColor='transparent'">
+          <span style="color: #858585; width: 24px; flex-shrink: 0; text-align: right; padding-right: 12px; font-size: 12px; line-height: 1.5;">${index + 1}</span>
+          <span style="flex: 1; color: #D4D4D4; font-size: 13px; line-height: 1.5;">${highlightedLine}</span>
+        </div>`
+      );
+    }).join('');
+  };
 
   // Auto-scroll to bottom of messages (only after new messages)
   useEffect(() => {
@@ -642,7 +677,7 @@ const Homepage = () => {
         {/* Main Content - Responsive Layout */}
         <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
           {/* Chat Area */}
-          <div className="flex flex-col flex-1 min-h-0">
+          <div className="flex flex-col lg:w-3/5 min-h-0">
             {/* Messages Area - Independent Scrolling */}
             <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 pb-6 thin-scrollbar">
               <div className="max-w-3xl mx-auto w-full">
@@ -728,7 +763,7 @@ const Homepage = () => {
           </div>
 
           {/* Preview/Code Panel - Right side on large screens, below on small */}
-          <div className="lg:w-1/2 xl:w-2/5 border-t lg:border-t-0 lg:border-l border-gray-800/50 flex flex-col bg-gray-900/20 backdrop-blur-sm">
+          <div className="lg:w-2/5 border-t lg:border-t-0 lg:border-l border-gray-800/50 flex flex-col bg-gray-900/20 backdrop-blur-sm">
             <div className="flex border-b border-gray-800/50">
               <button
                 onClick={() => setActiveTab("preview")}
@@ -794,30 +829,46 @@ const Homepage = () => {
                 </>
               ) : (
                 generatedCode ? (
-                  <pre className="bg-gray-900 rounded-xl p-4 text-sm overflow-auto h-full">
-                    <code className="whitespace-pre-wrap font-mono">
-                      <div className="text-gray-300">
-                        {generatedCode.split('\n').map((line, index) => (
-                          <div key={index} className="flex">
-                            <span className="text-gray-600 w-8 flex-shrink-0 select-none">{index + 1}</span>
-                            <span className="flex-1">
-                              {line
-                                .replace(/(import|export|from|default|const|let|var|function|return|if|else|for|while|class|extends|super|this|new|try|catch|finally|throw|switch|case|break|continue|do|in|of|typeof|instanceof|void|delete|with|debugger|yield|async|await|static|get|set|constructor)/g, 
-                                  '<span class="text-purple-400 font-medium">$1</span>')
-                                .replace(/(["'`].*?["'`])/g, 
-                                  '<span class="text-green-400">$1</span>')
-                                .replace(/(\d+)/g, 
-                                  '<span class="text-blue-400">$1</span>')
-                                .replace(/(\/\/.*$|\/\*[\s\S]*?\*\/)/gm, 
-                                  '<span class="text-gray-500">$1</span>')
-                                .replace(/({|}|\(|\)|\[|\]|;|:|,|\.)/g, 
-                                  '<span class="text-yellow-400">$1</span>')}
-                            </span>
-                          </div>
-                        ))}
+                  <div className="bg-gray-900 rounded-xl overflow-hidden h-full flex flex-col border border-gray-700">
+                    <div className="bg-gray-800/90 px-4 py-2 flex justify-between items-center border-b border-gray-700">
+                      <div className="text-xs text-gray-400 flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full bg-red-500"></span>
+                        <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
+                        <span className="w-3 h-3 rounded-full bg-green-500"></span>
+                        <span className="ml-2 text-gray-300">{language.toUpperCase()} • {generatedCode.split('\n').length} lines</span>
                       </div>
-                    </code>
-                  </pre>
+                      <div className="relative">
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(generatedCode);
+                            setShowCopiedMessage(true);
+                            setTimeout(() => setShowCopiedMessage(false), 2000);
+                          }}
+                          className="text-gray-300 hover:text-white text-xs px-2 py-1 rounded bg-gray-700/50 hover:bg-gray-700 transition-colors flex items-center gap-1 z-10 relative"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                          Copy
+                        </button>
+                        {showCopiedMessage && (
+                          <div className="absolute top-full mt-1 right-0 bg-gray-700 text-white text-xs px-2 py-1 rounded shadow-lg z-20 animate-fadeIn">
+                            Copied!
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex-1 overflow-auto p-0 relative bg-gray-900">
+                      <pre className="font-mono text-sm m-0 p-0 text-gray-100 bg-gray-900 whitespace-pre-wrap">
+                        <code 
+                          className="block"
+                          dangerouslySetInnerHTML={{ 
+                            __html: simpleHighlight(generatedCode, language) || '// No code generated yet' 
+                          }}
+                        />
+                      </pre>
+                    </div>
+                  </div>
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center text-gray-500 text-sm rounded-xl border-2 border-dashed border-gray-800/50 p-8 text-center">
                     <MdCode className="w-12 h-12 mb-4 text-gray-600" />
@@ -828,6 +879,7 @@ const Homepage = () => {
                   </div>
                 )
               )}
+
             </div>
           </div>
         </div>
@@ -849,8 +901,27 @@ const Homepage = () => {
           background-color: rgba(75, 85, 99, 0.7);
         }
         
-        pre code span {
-          display: inline;
+        pre code {
+          color: #e0e0e0;
+          display: block;
+        }
+        
+        /* Ensure text is visible in code preview */
+        .code-preview-container {
+          color: #e0e0e0;
+        }
+        
+        .code-line-number {
+          color: #858585;
+        }
+        
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .animate-fadeIn {
+          animation: fadeIn 0.2s ease-in-out forwards;
         }
       `}</style>
     </div>
