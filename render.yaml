@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: codegen-backend
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false

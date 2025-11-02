@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "health": "node -e \"require('http').get('http://localhost:5000/health', (res) => { console.log('Status Code:', res.statusCode); res.on('data', (chunk) => { console.log('Body:', chunk.toString()); }); });\""
   },
   "keywords": [],
   "author": "",

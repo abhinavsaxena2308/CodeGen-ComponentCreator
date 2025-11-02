@@ -1,59 +1,148 @@
 # CodeGen Component Creator
 
-This project is a React application for creating components with AI assistance. It has been migrated from Create React App to Vite for better performance and development experience.
+CodeGen is an AI-powered component generator that creates UI components based on natural language descriptions. Built with React, Vite, and Google's Gemini AI.
 
-## Environment Setup
+## Features
 
-Before running the application, you need to set up your environment variables:
+- AI-powered component generation using Google Gemini
+- Support for multiple frameworks (React, Vue, HTML, CSS, etc.)
+- Real-time preview of generated components
+- Chat-based interface similar to ChatGPT
+- Component history and management
 
-1. Create a Supabase project at [https://supabase.io/](https://supabase.io/) if you haven't already
-2. Get your Supabase URL and anon key from your Supabase project dashboard
-3. Copy the `.env.example` file to `.env`
-4. Replace the placeholder values with your actual credentials
+## Prerequisites
 
+1. Node.js (v14 or higher)
+2. A Google Gemini API key (get it from [Google AI Studio](https://aistudio.google.com/app/apikey))
+
+## Getting Started
+
+### Frontend Setup
+
+1. Install frontend dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+3. Build for production:
+   ```bash
+   npm run build
+   ```
+
+### Backend Setup
+
+1. Navigate to the server directory:
+   ```bash
+   cd server
+   ```
+
+2. Install backend dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Create a `.env` file with your Gemini API key:
+   ```bash
+   cp .env.example .env
+   # Edit .env and add your API key
+   ```
+
+4. Start the backend server:
+   ```bash
+   npm run dev
+   ```
+
+## Deployment
+
+### Deploying the Backend
+
+The backend can be deployed to several platforms. See [server/README.md](server/README.md) for detailed instructions.
+
+#### Quick Deploy to Render (Recommended)
+
+1. Fork this repository to your GitHub account
+2. Go to [Render](https://render.com/) and create an account
+3. Click "New Web Service"
+4. Connect your GitHub repository
+5. Configure the service:
+   - Name: `codegen-backend`
+   - Environment: `Node`
+   - Build command: `npm install`
+   - Start command: `npm start`
+   - Plan: `Free`
+6. Add environment variables:
+   - `GEMINI_API_KEY`: Your actual Gemini API key
+7. Click "Create Web Service"
+
+### Deploying the Frontend
+
+The frontend can be deployed to any static hosting service like Vercel, Netlify, or GitHub Pages.
+
+#### Deploy to Vercel
+
+1. Build the frontend:
+   ```bash
+   npm run build
+   ```
+
+2. The built files will be in the `dist/` directory
+3. Deploy the `dist/` directory to Vercel
+
+#### Deploy to Netlify
+
+1. Build the frontend:
+   ```bash
+   npm run build
+   ```
+
+2. Deploy the `dist/` directory to Netlify
+
+## Environment Variables
+
+### Frontend (.env)
+Create a `.env` file in the root directory:
 ```bash
-cp .env.example .env
+VITE_API_URL=https://your-backend-url.com
+VITE_SUPABASE_URL=your-supabase-url
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+VITE_MEM0_API_KEY=your-mem0-api-key
 ```
 
-### Supabase Setup
+### Backend (.env)
+Create a `.env` file in the `server/` directory:
+```bash
+GEMINI_API_KEY=your-gemini-api-key
+PORT=5000
+```
 
-1. Go to [https://supabase.io/](https://supabase.io/) and create a free account
-2. Create a new project
-3. In your project dashboard, find your project URL and anon key in the API settings
-4. Update the `.env` file with these values
+## Project Structure
 
-### Mem0 Setup (Optional)
+- `src/` - Frontend React components
+- `server/` - Backend Node.js/Express server
+- `public/` - Static assets
+- `dist/` - Built frontend files
 
-1. Go to [https://mem0.ai/](https://mem0.ai/) and create an account
-2. Get your API key from the dashboard
-3. Update the `VITE_MEM0_API_KEY` in your `.env` file with your actual API key
+## API Endpoints
 
-## Available Scripts
+- `POST /generate` - Generate code based on a prompt
+- `GET /preview/:id` - Get preview HTML for a generated component
+- `GET /history` - Get generation history
+- `GET /languages` - Get supported languages
+- `GET /health` - Health check endpoint
 
-In the project directory, you can run:
+## Contributing
 
-### `npm run dev` or `npm start`
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a pull request
 
-Runs the app in development mode using Vite.
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## License
 
-The page will reload when you make changes.
-
-### `npm run build`
-
-Builds the app for production to the `dist` folder.
-
-### `npm run preview`
-
-Preview the production build locally.
-
-## Learn More
-
-This project uses:
-- [Vite](https://vitejs.dev/) as the build tool
-- [React](https://reactjs.org/) for the UI
-- [Tailwind CSS](https://tailwindcss.com/) for styling
-- [Supabase](https://supabase.io/) for authentication
-- [Mem0](https://mem0.ai/) for memory management
-
-For more information on React, check out the [React documentation](https://reactjs.org/).
+This project is licensed under the MIT License.
