@@ -68,10 +68,25 @@ function makeId() {
 // create an iframe-friendly preview for React or raw HTML/JS/CSS
 function buildPreviewHtml(code, language) {
   const lang = (language || '').toLowerCase();
-  if (lang === 'html' || lang === 'html/css' || lang === 'plain' || lang === 'js' || lang === 'javascript') {
-    // return a wrapped HTML page (safe for iframe srcdoc)
-    const escaped = code.replace(/<\/script>/gi, '<\\/script>');
-    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"/></head><body>${escaped}</body></html>`;
+  
+  // Handle all HTML-related languages
+  if (lang === 'html' || lang === 'html/css' || lang === 'plain' || 
+      lang === 'js' || lang === 'javascript' || lang === 'html+css' || 
+      lang === 'html+tailwind') {
+    // For HTML-related content, we want to show it directly
+    if (lang === 'html' || lang.startsWith('html')) {
+      // If it's already a complete HTML document, return as-is
+      if (code.trim().startsWith('<!DOCTYPE') || code.trim().startsWith('<html')) {
+        return code;
+      }
+      // Otherwise wrap it in a basic HTML structure
+      const escaped = code.replace(/<\/script>/gi, '<\\/script>');
+      return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"/></head><body>${escaped}</body></html>`;
+    } else {
+      // For plain, js, javascript, return a wrapped HTML page
+      const escaped = code.replace(/<\/script>/gi, '<\\/script>');
+      return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"/></head><body>${escaped}</body></html>`;
+    }
   }
 
   if (lang === 'react' || lang === 'reactjs' || lang === 'react.jsx' || lang === 'reacttsx') {
@@ -121,6 +136,108 @@ function buildPreviewHtml(code, language) {
   <script type="module">
     ${safeScript}
   </script>
+</body>
+</html>`;
+  }
+
+  // Handle Vue.js
+  if (lang === 'vue') {
+    // Simple Vue preview using CDN
+    const escaped = code.replace(/<\/script>/gi, '<\\/script>');
+    return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Vue Preview</title>
+  <!-- Vue 3 -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    ${escaped}
+  </script>
+</body>
+</html>`;
+  }
+
+  // Handle CSS
+  if (lang === 'css') {
+    return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <style>
+    ${code}
+  </style>
+</head>
+<body>
+  <div class="preview-container">
+    <h1>CSS Preview</h1>
+    <p>Below is a sample element to demonstrate your CSS:</p>
+    <div class="sample-element">Sample Element</div>
+  </div>
+</body>
+</html>`;
+  }
+
+  // Handle JavaScript
+  if (lang === 'javascript' || lang === 'js') {
+    const escaped = code.replace(/<\/script>/gi, '<\\/script>');
+    return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+</head>
+<body>
+  <script>
+    ${escaped}
+  </script>
+</body>
+</html>`;
+  }
+
+  // Handle TypeScript
+  if (lang === 'typescript' || lang === 'ts') {
+    // For TypeScript, we show it as code since browser can't execute it directly
+    const escaped = String(code).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    pre { margin: 0; }
+  </style>
+</head>
+<body>
+  <h2>TypeScript Code Preview</h2>
+  <pre>${escaped}</pre>
+</body>
+</html>`;
+  }
+
+  // Handle Python, Java and other backend languages
+  if (lang === 'python' || lang === 'java') {
+    const escaped = String(code).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    pre { margin: 0; }
+  </style>
+</head>
+<body>
+  <h2>${language} Code Preview</h2>
+  <pre>${escaped}</pre>
+  <p style="margin-top: 20px; color: #999;">Note: This is backend code that cannot be executed in the browser.</p>
 </body>
 </html>`;
   }

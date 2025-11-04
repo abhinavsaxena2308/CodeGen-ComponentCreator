@@ -805,6 +805,7 @@ const Homepage = () => {
                         title="generated-preview"
                         src={`${API_BASE}/preview/${previewId}`}
                         className="w-full h-full border-none rounded-xl"
+                        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
                         onLoad={handleIframeLoad}
                         onError={handleIframeError}
                       />
