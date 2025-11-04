@@ -38,31 +38,21 @@ const Homepage = () => {
   const simpleHighlight = (code, lang) => {
     if (!code) return '';
     
-    // Split into lines
+    // For now, let's return the code as-is without additional formatting
+    // Split into lines and add line numbers
     const lines = code.split('\n');
     
-    // Apply basic syntax highlighting without language-specific rules
     return lines.map((line, index) => {
-      let highlightedLine = line;
-      
-      // Escape HTML
-      highlightedLine = highlightedLine
+      // Escape HTML characters
+      const escapedLine = line
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
       
-      // Apply basic highlighting for all languages
-      highlightedLine = highlightedLine
-        .replace(/(\/\/.*$|\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->|\/\*[\s\S]*?\*\/)/gm, '<span style="color: #6A9955;">$1</span>') // Comments - green
-        .replace(/(["'`])(?:(?=(\\?))\2.)*?\1/g, '<span style="color: #CE9178;">$1</span>') // Strings - red
-        .replace(/\b(true|false|null|undefined|NaN|Infinity|True|False|None)\b/g, '<span style="color: #569CD6;">$1</span>') // Literals - blue
-        .replace(/\b\d+(?:\.\d+)?\b/g, '<span style="color: #B5CEA8;">$1</span>') // Numbers - light green
-        .replace(/([{}()\[\];:,.*+\-%<>!=&|?^~])/g, '<span style="color: #D4D4D4;">$1</span>'); // Operators - white
-      
       return (
         `<div style="display: flex; padding: 0 8px; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#2A2D2E'" onmouseout="this.style.backgroundColor='transparent'">
           <span style="color: #858585; width: 24px; flex-shrink: 0; text-align: right; padding-right: 12px; font-size: 12px; line-height: 1.5;">${index + 1}</span>
-          <span style="flex: 1; color: #D4D4D4; font-size: 13px; line-height: 1.5;">${highlightedLine}</span>
+          <span style="flex: 1; color: #D4D4D4; font-size: 13px; line-height: 1.5;">${escapedLine}</span>
         </div>`
       );
     }).join('');

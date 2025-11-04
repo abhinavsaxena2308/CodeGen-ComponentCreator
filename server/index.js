@@ -90,15 +90,30 @@ function buildPreviewHtml(code, language) {
   }
 
   if (lang === 'react' || lang === 'reactjs' || lang === 'react.jsx' || lang === 'reacttsx') {
-    // basic React sandbox using unpkg + Babel (client-side transform)
-    // Note: This is a lightweight approach for quick previews; for production use a proper bundler sandbox.
+    // Enhanced React component preview with better error handling and Babel transform
     let cleaned = code;
-    // convert `export default` to a renderable const (best-effort)
-    cleaned = cleaned.replace(/export\s+default/gi, 'const Component =');
     
-    // For React, we only need to include the code once in the script tag
+    // Handle different React component formats
+    // If it's a functional component with export default
+    if (cleaned.includes('export default')) {
+      cleaned = cleaned.replace(/export\s+default\s+(function\s+|\w+\s*=>|\w+\s*\()/gi, 'const Component = $1');
+    } 
+    // If it's a class component with export default
+    else if (cleaned.includes('class') && cleaned.includes('extends Component') || cleaned.includes('extends React.Component')) {
+      cleaned = cleaned.replace(/export\s+default\s+class/gi, 'class');
+      // Add a render statement at the end
+      cleaned += '\nReactDOM.createRoot(document.getElementById("root")).render(<Component />);';
+    }
+    // If it's just a component without export default, wrap it
+    else if (!cleaned.includes('const Component') && !cleaned.includes('function Component')) {
+      cleaned = `const Component = ${cleaned}`;
+    }
+    
+    // Ensure React and ReactDOM are properly imported in the preview
     const script = `
       ${cleaned}
+      
+      // Ensure the component is rendered
       try {
         const mount = document.getElementById('root');
         if (typeof Component !== 'undefined') {
@@ -106,19 +121,20 @@ function buildPreviewHtml(code, language) {
         } else if (typeof App !== 'undefined') {
           ReactDOM.createRoot(mount).render(React.createElement(App));
         } else {
-          // attempt to render default export fallback if file used export = ...
+          // If we have a direct JSX element, try to render it
           console.warn('No Component or App export found. Render output may be empty.');
         }
       } catch (e) {
-        const pre = document.createElement('pre');
-        pre.style.color = 'red';
-        pre.textContent = 'Runtime error:\\n' + e.toString();
-        document.body.appendChild(pre);
+        // Create an error display element
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = 'color: red; padding: 20px; font-family: monospace; white-space: pre-wrap;';
+        errorDiv.innerHTML = 'Runtime error: ' + e.toString() + '\\n\\n' + e.stack;
+        document.body.appendChild(errorDiv);
         console.error(e);
       }
     `;
     
-    // escape closing script tags in cleaned content
+    // Escape closing script tags
     const safeScript = script.replace(/<\/script>/gi, '<\\/script>');
     
     return `<!doctype html>
@@ -126,14 +142,29 @@ function buildPreviewHtml(code, language) {
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <style>html,body,#root{height:100%;margin:0;padding:0}</style>
+  <title>React Component Preview</title>
+  <style>
+    html, body, #root {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    .error-container {
+      color: red;
+      padding: 20px;
+      font-family: monospace;
+      white-space: pre-wrap;
+    }
+  </style>
   <!-- React 18 -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <!-- Babel for JSX transformation -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body>
   <div id="root"></div>
-  <script type="module">
+  <script type="text/babel">
     ${safeScript}
   </script>
 </body>
